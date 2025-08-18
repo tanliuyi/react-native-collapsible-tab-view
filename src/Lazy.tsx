@@ -3,10 +3,10 @@ import { StyleSheet } from 'react-native'
 import Animated, {
   useSharedValue,
   useAnimatedReaction,
-  runOnJS,
   withTiming,
   useAnimatedStyle,
 } from 'react-native-reanimated'
+import { runOnJS } from 'react-native-worklets'
 
 import { ScrollView } from './ScrollView'
 import { useScroller, useTabNameContext, useTabsContext } from './hooks'

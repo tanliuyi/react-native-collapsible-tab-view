@@ -1,6 +1,6 @@
 import type {
   FlashListProps,
-  FlashList as SPFlashList,
+  FlashListRef as SPFlashListRef,
 } from '@shopify/flash-list'
 import React, { useCallback } from 'react'
 import Animated, {
@@ -24,9 +24,11 @@ import {
  */
 
 type FlashListMemoProps = React.PropsWithChildren<FlashListProps<unknown>>
-type FlashListMemoRef = SPFlashList<any>
+type FlashListMemoRef = SPFlashListRef<any>
 
-let AnimatedFlashList: React.ComponentClass<FlashListProps<any>> | null = null
+let AnimatedFlashList: React.ForwardRefExoticComponent<
+  FlashListProps<any> & React.RefAttributes<SPFlashListRef<any>>
+> | null = null
 
 const ensureFlastList = () => {
   if (AnimatedFlashList) {
@@ -37,7 +39,9 @@ const ensureFlastList = () => {
     const flashListModule = require('@shopify/flash-list')
     AnimatedFlashList = Animated.createAnimatedComponent(
       flashListModule.FlashList
-    ) as unknown as React.ComponentClass<FlashListProps<any>>
+    ) as unknown as React.ForwardRefExoticComponent<
+      FlashListProps<any> & React.RefAttributes<SPFlashListRef<any>>
+    >
   } catch {
     console.error(
       'The optional dependency @shopify/flash-list is not installed. Please install it to use the FlashList component.'
@@ -64,7 +68,7 @@ function FlashListImpl<R>(
     contentContainerStyle: _contentContainerStyle,
     ...rest
   }: Omit<FlashListProps<R>, 'onScroll'>,
-  passRef: React.Ref<SPFlashList<any>>
+  passRef: React.Ref<SPFlashListRef<any>>
 ) {
   const name = useTabNameContext()
   const { setRef, contentInset } = useTabsContext()
@@ -130,9 +134,8 @@ function FlashListImpl<R>(
   const memoContentContainerStyle = React.useMemo(
     () => ({
       paddingTop: contentContainerStyle.paddingTop,
-      ..._contentContainerStyle,
     }),
-    [_contentContainerStyle, contentContainerStyle.paddingTop]
+    [contentContainerStyle.paddingTop]
   )
 
   const refWorkaround = useCallback(
@@ -141,7 +144,7 @@ function FlashListImpl<R>(
       // We are not accessing the right element or view of the Flashlist (recyclerlistview). So we need to give
       // this ref the access to it
       // eslint-ignore
-      ;(recyclerRef as any)(value?.recyclerlistview_unsafe)
+      ;(recyclerRef as any)(value)
       ;(ref as any)(value)
     },
     [recyclerRef, ref]
@@ -153,7 +156,10 @@ function FlashListImpl<R>(
       {...rest}
       onLoad={onLoad}
       ref={refWorkaround}
-      contentContainerStyle={memoContentContainerStyle}
+      contentContainerStyle={[
+        memoContentContainerStyle,
+        _contentContainerStyle,
+      ]}
       bouncesZoom={false}
       onScroll={scrollHandler}
       scrollEventThrottle={16}
@@ -171,5 +177,5 @@ function FlashListImpl<R>(
  * Use like a regular FlashList.
  */
 export const FlashList = React.forwardRef(FlashListImpl) as <T>(
-  p: FlashListProps<T> & { ref?: React.Ref<SPFlashList<T>> }
+  p: FlashListProps<T> & { ref?: React.Ref<SPFlashListRef<T>> }
 ) => React.ReactElement

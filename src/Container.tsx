@@ -2,8 +2,6 @@ import React from 'react'
 import { StyleSheet, useWindowDimensions, View } from 'react-native'
 import PagerView from 'react-native-pager-view'
 import Animated, {
-  runOnJS,
-  runOnUI,
   useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
@@ -12,6 +10,7 @@ import Animated, {
   withTiming,
   useFrameCallback,
 } from 'react-native-reanimated'
+import { runOnJS, runOnUI } from 'react-native-worklets'
 
 import { Context, TabNameContext } from './Context'
 import { Lazy } from './Lazy'

@@ -4,9 +4,9 @@ import {
   useState,
   useCallback,
   useContext,
-  MutableRefObject,
   useEffect,
   useRef,
+  RefObject,
 } from 'react'
 import { LayoutChangeEvent, StyleSheet, ViewProps } from 'react-native'
 import { ContainerRef, RefComponent } from 'react-native-collapsible-tab-view'
@@ -20,13 +20,12 @@ import Animated, {
   withDelay,
   withTiming,
   interpolate,
-  runOnJS,
-  runOnUI,
   useEvent,
   useHandler,
   AnimatedRef,
   Extrapolation,
 } from 'react-native-reanimated'
+import { runOnJS, runOnUI } from 'react-native-worklets'
 import { useDeepCompareMemo } from 'use-deep-compare'
 
 import { Context, TabNameContext } from './Context'
@@ -513,7 +512,7 @@ export const useScrollHandlerY = (name: TabName) => {
 
 type ForwardRefType<T> =
   | ((instance: T | null) => void)
-  | MutableRefObject<T | null>
+  | RefObject<T | null>
   | null
 
 /**
