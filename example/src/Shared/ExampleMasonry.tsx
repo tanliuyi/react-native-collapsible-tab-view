@@ -1,3 +1,4 @@
+import { ListRenderItemInfo } from '@shopify/flash-list/src/FlashListProps'
 import * as React from 'react'
 import {
   Alert,
@@ -42,12 +43,7 @@ export async function asyncGetItems(count = 20, delay = 1000) {
   return getItems(count)
 }
 
-interface MasonryItemProps {
-  item: Item
-  index: number
-}
-
-const MasonryItem: React.FC<MasonryItemProps> = ({ item, index }) => {
+const MasonryItem = ({ item, index }: ListRenderItemInfo<Item>) => {
   return (
     <TouchableOpacity
       style={{
@@ -126,10 +122,9 @@ const ExampleMasonry: React.FC<{
   }, [])
 
   return (
-    <Tabs.MasonryFlashList
+    <Tabs.FlashList
       data={emptyList ? [] : limit ? data.slice(0, limit) : data}
       numColumns={2}
-      estimatedItemSize={60}
       keyExtractor={(_, i) => String(i)}
       renderItem={MasonryItem}
       ItemSeparatorComponent={ItemSeparator}
@@ -139,6 +134,7 @@ const ExampleMasonry: React.FC<{
       refreshing={Platform.OS === 'ios' ? isRefreshing : undefined}
       nestedScrollEnabled={nestedScrollEnabled}
       onEndReached={loadmore}
+      masonry
     />
   )
 }

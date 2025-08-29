@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@expo/metro-runtime": "~5.0.4",
     "@expo/vector-icons": "^14.1.0",
     "@shopify/flash-list": "^2.0.3",
-    "expo": "^53.0.20",
+    "expo": "~53.0.22",
     "expo-constants": "~17.1.7",
     "expo-font": "~13.3.2",
-    "expo-modules-core": "~2.5.0",
     "expo-splash-screen": "~0.30.10",
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",
@@ -16,17 +16,18 @@
     "react-native": "0.79.6",
     "react-native-gesture-handler": "^2.28.0",
     "react-native-pager-view": "^6.9.1",
-    "react-native-reanimated": "~3.17.4",
-    "react-native-web": "^0.20.0",
+    "react-native-reanimated": "^4.0.3",
+    "react-native-web": "~0.20.0",
     "react-native-worklets": "^0.4.2",
     "use-debounce": "^5.2.0",
     "use-deep-compare": "^1.1.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.26.0",
-    "@types/react": "~19.0.10",
-    "@types/react-dom": "~18.0.10",
-    "babel-preset-expo": "~13.0.0",
+    "@babel/core": "^7.20.0",
+    "@types/react": "19.1.10",
+    "@types/react-dom": "19.1.9",
+    "react-native-builder-bob": "^0.40.13",
+    "react-native-monorepo-config": "^0.1.9",
     "typescript": "~5.8.3"
   },
   "scripts": {
@@ -35,6 +36,5 @@
     "ios": "expo run:ios",
     "web": "expo web",
     "eject": "expo eject"
-  },
-  "packageManager": "yarn@4.9.2"
+  }
 }

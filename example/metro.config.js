@@ -1,28 +1,20 @@
-// Learn more https://docs.expo.io/guides/customizing-metro
-const { getDefaultConfig } = require('expo/metro-config')
+const { getDefaultConfig } = require('@expo/metro-config')
 const path = require('path')
+const { withMetroConfig } = require('react-native-monorepo-config')
 
-const extraNodeModules = {
-  'react-native-collapsible-tab-view': path.resolve(`${__dirname}/../src`),
-}
+const root = path.resolve(__dirname, '..')
 
-const config = getDefaultConfig(__dirname)
-
-config.transformer.getTransformOptions = async () => ({
-  transform: {
-    experimentalImportSupport: false,
-    inlineRequires: false,
-  },
+/**
+ * Metro configuration
+ * https://facebook.github.io/metro/docs/configuration
+ *
+ * @type {import('metro-config').MetroConfig}
+ */
+const config = withMetroConfig(getDefaultConfig(__dirname), {
+  root,
+  dirname: __dirname,
 })
 
-config.resolver.extraNodeModules = new Proxy(extraNodeModules, {
-  get: (target, name) =>
-    //redirects dependencies referenced from src/ to local node_modules
-    name in target
-      ? target[name]
-      : path.join(process.cwd(), `node_modules/${name}`),
-})
-
-config.watchFolders = [path.resolve(`${__dirname}/../src`)]
+config.resolver.unstable_enablePackageExports = true
 
 module.exports = config

@@ -10,7 +10,7 @@ const title = 'Scroll On Header'
 
 const HEADER_HEIGHT = 400
 
-const NewHeader: React.FC<TabBarProps> = (props) => {
+const NewHeader = (props: TabBarProps) => {
   return (
     <View pointerEvents="none">
       <Header

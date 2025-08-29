@@ -10,6 +10,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  DimensionValue,
 } from 'react-native'
 
 import AndroidSharedPullToRefresh from './AndroidSharedPullToRefresh'
@@ -136,15 +137,7 @@ const ExampleList: React.FC<object> = () => {
                 style={styles.button}
                 onPress={handleNavigateBack}
               >
-                <Ionicons
-                  name={
-                    Platform.OS === 'android'
-                      ? 'md-arrow-back'
-                      : 'ios-arrow-back'
-                  }
-                  size={24}
-                  color={tintColor}
-                />
+                <Ionicons name="arrow-back" size={24} color={tintColor} />
               </TouchableOpacity>
             ) : null}
             <Text
@@ -168,7 +161,7 @@ const ExampleList: React.FC<object> = () => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#eceff1',
-    height: Platform.OS === 'web' ? '100vh' : '100%',
+    height: Platform.OS === 'web' ? ('100vh' as DimensionValue) : '100%',
   },
   statusbar: {
     height: Platform.select({
