@@ -2,11 +2,9 @@ import type {
   FlashListProps,
   FlashListRef as SPFlashListRef,
 } from '@shopify/flash-list'
+import { AnimatedFlashList } from '@shopify/flash-list'
 import React, { useCallback } from 'react'
-import Animated, {
-  useSharedValue,
-  useAnimatedReaction,
-} from 'react-native-reanimated'
+import { useAnimatedReaction, useSharedValue } from 'react-native-reanimated'
 
 import {
   useChainCallback,
@@ -26,43 +24,14 @@ import {
 type FlashListMemoProps = React.PropsWithChildren<FlashListProps<unknown>>
 type FlashListMemoRef = SPFlashListRef<any>
 
-let AnimatedFlashList: React.ForwardRefExoticComponent<
-  FlashListProps<any> & React.RefAttributes<SPFlashListRef<any>>
-> | null = null
-
-const ensureFlastList = () => {
-  if (AnimatedFlashList) {
-    return
-  }
-
-  try {
-    const flashListModule = require('@shopify/flash-list')
-    AnimatedFlashList = Animated.createAnimatedComponent(
-      flashListModule.FlashList
-    ) as unknown as React.ForwardRefExoticComponent<
-      FlashListProps<any> & React.RefAttributes<SPFlashListRef<any>>
-    >
-  } catch {
-    console.error(
-      'The optional dependency @shopify/flash-list is not installed. Please install it to use the FlashList component.'
-    )
-  }
-}
-
 const FlashListMemo = React.memo(
   React.forwardRef<FlashListMemoRef, FlashListMemoProps>((props, passRef) => {
-    ensureFlastList()
-    return AnimatedFlashList ? (
-      <AnimatedFlashList ref={passRef} {...props} />
-    ) : (
-      <></>
-    )
+    return <AnimatedFlashList ref={passRef as any} {...props} />
   })
 )
 
 function FlashListImpl<R>(
   {
-    style,
     onContentSizeChange,
     refreshControl,
     contentContainerStyle: _contentContainerStyle,
@@ -75,7 +44,14 @@ function FlashListImpl<R>(
   const ref = useSharedAnimatedRef<any>(passRef)
   const recyclerRef = useSharedAnimatedRef<any>(null)
 
-  const { scrollHandler, enable } = useScrollHandlerY(name)
+  const {
+    onScrollHandler,
+    onBeginDragHandler,
+    onEndDragHandler,
+    onMomentumBeginHandler,
+    onMomentumEndHandler,
+    enable,
+  } = useScrollHandlerY(name)
 
   const hadLoad = useSharedValue(false)
 
@@ -132,10 +108,13 @@ function FlashListImpl<R>(
   )
 
   const memoContentContainerStyle = React.useMemo(
-    () => ({
-      paddingTop: contentContainerStyle.paddingTop,
-    }),
-    [contentContainerStyle.paddingTop]
+    () => [
+      {
+        paddingTop: contentContainerStyle.paddingTop,
+      },
+      _contentContainerStyle,
+    ],
+    [_contentContainerStyle, contentContainerStyle.paddingTop]
   )
 
   const refWorkaround = useCallback(
@@ -156,12 +135,13 @@ function FlashListImpl<R>(
       {...rest}
       onLoad={onLoad}
       ref={refWorkaround}
-      contentContainerStyle={[
-        memoContentContainerStyle,
-        _contentContainerStyle,
-      ]}
+      contentContainerStyle={memoContentContainerStyle}
       bouncesZoom={false}
-      onScroll={scrollHandler}
+      onScroll={onScrollHandler}
+      onScrollBeginDrag={onBeginDragHandler}
+      onScrollEndDrag={onEndDragHandler}
+      onMomentumScrollBegin={onMomentumBeginHandler}
+      onMomentumScrollEnd={onMomentumEndHandler}
       scrollEventThrottle={16}
       contentInset={memoContentInset}
       contentOffset={memoContentOffset}

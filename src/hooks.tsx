@@ -8,7 +8,13 @@ import {
   useRef,
   RefObject,
 } from 'react'
-import { LayoutChangeEvent, StyleSheet, ViewProps } from 'react-native'
+import {
+  LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  StyleSheet,
+  ViewProps,
+} from 'react-native'
 import { ContainerRef, RefComponent } from 'react-native-collapsible-tab-view'
 import { PagerViewOnPageScrollEvent } from 'react-native-pager-view'
 import Animated, {
@@ -279,7 +285,7 @@ export const useScrollHandlerY = (name: TabName) => {
       'worklet'
       enabled.value = toggle
     },
-    [name, refMap, scrollTo]
+    [enabled]
   )
 
   /**
@@ -353,90 +359,114 @@ export const useScrollHandlerY = (name: TabName) => {
     }
   }
 
+  const onScroll = (event: NativeScrollEvent) => {
+    'worklet'
+    if (!enabled.value) return
+
+    if (focusedTab.value === name) {
+      if (IS_IOS) {
+        let { y } = event.contentOffset
+        // normalize the value so it starts at 0
+        y = y + contentInset
+
+        const contentHeight =
+          contentHeights.value[tabNames.value.indexOf(name)] || Number.MAX_VALUE
+
+        const clampMax = contentHeight - (containerHeight || 0) + contentInset
+        // make sure the y value is clamped to the scrollable size (clamps overscrolling)
+        scrollYCurrent.value = allowHeaderOverscroll
+          ? y
+          : interpolate(y, [0, clampMax], [0, clampMax], Extrapolation.CLAMP)
+      } else {
+        const { y } = event.contentOffset
+        scrollYCurrent.value = y
+      }
+
+      scrollY.value[name] = scrollYCurrent.value
+      oldAccScrollY.value = accScrollY.value
+      accScrollY.value = scrollY.value[name] + offset.value
+
+      if (revealHeaderOnScroll) {
+        const delta = accScrollY.value - oldAccScrollY.value
+        const nextValue = accDiffClamp.value + delta
+        if (delta > 0) {
+          // scrolling down
+          accDiffClamp.value = Math.min(headerScrollDistance.value, nextValue)
+        } else if (delta < 0) {
+          // scrolling up
+          accDiffClamp.value = Math.max(0, nextValue)
+        }
+      }
+    }
+  }
+  const onBeginDrag = () => {
+    'worklet'
+    if (!enabled.value) return
+
+    // ensure the header stops snapping
+    cancelAnimation(accDiffClamp)
+
+    if (IS_IOS) cancelAnimation(afterDrag)
+  }
+  const onEndDrag = () => {
+    'worklet'
+    if (!enabled.value) return
+
+    if (IS_IOS) {
+      // we delay this by one frame so that onMomentumBegin may fire on iOS
+      afterDrag.value = withDelay(
+        ONE_FRAME_MS,
+        withTiming(0, { duration: 0 }, (isFinished) => {
+          // if the animation is finished, the onMomentumBegin has
+          // never started, so we need to manually trigger the onMomentumEnd
+          // to make sure we snap
+          if (isFinished) {
+            onMomentumEnd()
+          }
+        })
+      )
+    }
+  }
+  const onMomentumBegin = () => {
+    'worklet'
+    if (!enabled.value) return
+
+    if (IS_IOS) {
+      cancelAnimation(afterDrag)
+    }
+  }
+
+  const onScrollHandler = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    'use memo'
+    runOnUI(onScroll)(event.nativeEvent)
+  }
+
+  const onBeginDragHandler = () => {
+    'use memo'
+    runOnUI(onBeginDrag)()
+  }
+
+  const onEndDragHandler = () => {
+    'use memo'
+    runOnUI(onEndDrag)()
+  }
+
+  const onMomentumBeginHandler = () => {
+    'use memo'
+    runOnUI(onMomentumBegin)()
+  }
+
+  const onMomentumEndHandler = () => {
+    'use memo'
+    runOnUI(onMomentumEnd)()
+  }
+
   const scrollHandler = useAnimatedScrollHandler(
     {
-      onScroll: (event) => {
-        if (!enabled.value) return
-
-        if (focusedTab.value === name) {
-          if (IS_IOS) {
-            let { y } = event.contentOffset
-            // normalize the value so it starts at 0
-            y = y + contentInset
-
-            const contentHeight =
-              contentHeights.value[tabNames.value.indexOf(name)] ||
-              Number.MAX_VALUE
-
-            const clampMax =
-              contentHeight - (containerHeight || 0) + contentInset
-            // make sure the y value is clamped to the scrollable size (clamps overscrolling)
-            scrollYCurrent.value = allowHeaderOverscroll
-              ? y
-              : interpolate(
-                  y,
-                  [0, clampMax],
-                  [0, clampMax],
-                  Extrapolation.CLAMP
-                )
-          } else {
-            const { y } = event.contentOffset
-            scrollYCurrent.value = y
-          }
-
-          scrollY.value[name] = scrollYCurrent.value
-          oldAccScrollY.value = accScrollY.value
-          accScrollY.value = scrollY.value[name] + offset.value
-
-          if (revealHeaderOnScroll) {
-            const delta = accScrollY.value - oldAccScrollY.value
-            const nextValue = accDiffClamp.value + delta
-            if (delta > 0) {
-              // scrolling down
-              accDiffClamp.value = Math.min(
-                headerScrollDistance.value,
-                nextValue
-              )
-            } else if (delta < 0) {
-              // scrolling up
-              accDiffClamp.value = Math.max(0, nextValue)
-            }
-          }
-        }
-      },
-      onBeginDrag: () => {
-        if (!enabled.value) return
-
-        // ensure the header stops snapping
-        cancelAnimation(accDiffClamp)
-
-        if (IS_IOS) cancelAnimation(afterDrag)
-      },
-      onEndDrag: () => {
-        if (!enabled.value) return
-
-        if (IS_IOS) {
-          // we delay this by one frame so that onMomentumBegin may fire on iOS
-          afterDrag.value = withDelay(
-            ONE_FRAME_MS,
-            withTiming(0, { duration: 0 }, (isFinished) => {
-              // if the animation is finished, the onMomentumBegin has
-              // never started, so we need to manually trigger the onMomentumEnd
-              // to make sure we snap
-              if (isFinished) {
-                onMomentumEnd()
-              }
-            })
-          )
-        }
-      },
-      onMomentumBegin: () => {
-        if (!enabled.value) return
-
-        if (IS_IOS) {
-          cancelAnimation(afterDrag)
-        }
-      },
+      onScroll,
+      onBeginDrag,
+      onEndDrag,
+      onMomentumBegin,
       onMomentumEnd,
     },
     [
@@ -507,7 +537,15 @@ export const useScrollHandlerY = (name: TabName) => {
     [revealHeaderOnScroll, refMap, snapThreshold, enabled, scrollTo]
   )
 
-  return { scrollHandler, enable }
+  return {
+    scrollHandler,
+    onScrollHandler,
+    onBeginDragHandler,
+    onEndDragHandler,
+    onMomentumBeginHandler,
+    onMomentumEndHandler,
+    enable,
+  }
 }
 
 type ForwardRefType<T> =
