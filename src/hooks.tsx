@@ -17,7 +17,7 @@ import {
 } from 'react-native'
 import { ContainerRef, RefComponent } from 'react-native-collapsible-tab-view'
 import { PagerViewOnPageScrollEvent } from 'react-native-pager-view'
-import Animated, {
+import {
   cancelAnimation,
   useAnimatedReaction,
   useAnimatedRef,
@@ -30,8 +30,8 @@ import Animated, {
   useHandler,
   AnimatedRef,
   Extrapolation,
+  SharedValue,
 } from 'react-native-reanimated'
-import { runOnJS, runOnUI } from 'react-native-worklets'
 import { useDeepCompareMemo } from 'use-deep-compare'
 
 import { Context, TabNameContext } from './Context'
@@ -200,7 +200,7 @@ export function useUpdateScrollViewContentSize({ name }: { name: TabName }) {
 
   const scrollContentSizeChange = useCallback(
     (_: number, h: number) => {
-      runOnUI(setContentHeights)(name, h)
+      setContentHeights(name, h)
     },
     [setContentHeights, name]
   )
@@ -274,6 +274,7 @@ export const useScrollHandlerY = (name: TabName) => {
     contentHeights,
     indexDecimal,
     allowHeaderOverscroll,
+    isScrolling,
   } = useTabsContext()
 
   const enabled = useSharedValue(false)
@@ -310,6 +311,9 @@ export const useScrollHandlerY = (name: TabName) => {
   const onMomentumEnd = () => {
     'worklet'
     if (!enabled.value) return
+
+    // 标记滚动结束，允许同步操作
+    isScrolling.value = false
 
     if (typeof snapThreshold === 'number') {
       if (revealHeaderOnScroll) {
@@ -403,6 +407,9 @@ export const useScrollHandlerY = (name: TabName) => {
     'worklet'
     if (!enabled.value) return
 
+    // 标记开始滚动，防止同步操作干扰
+    isScrolling.value = true
+
     // ensure the header stops snapping
     cancelAnimation(accDiffClamp)
 
@@ -431,6 +438,9 @@ export const useScrollHandlerY = (name: TabName) => {
     'worklet'
     if (!enabled.value) return
 
+    // 确保在惯性滚动期间也标记为正在滚动
+    isScrolling.value = true
+
     if (IS_IOS) {
       cancelAnimation(afterDrag)
     }
@@ -438,27 +448,27 @@ export const useScrollHandlerY = (name: TabName) => {
 
   const onScrollHandler = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     'use memo'
-    runOnUI(onScroll)(event.nativeEvent)
+    onScroll(event.nativeEvent)
   }
 
   const onBeginDragHandler = () => {
     'use memo'
-    runOnUI(onBeginDrag)()
+    onBeginDrag()
   }
 
   const onEndDragHandler = () => {
     'use memo'
-    runOnUI(onEndDrag)()
+    onEndDrag()
   }
 
   const onMomentumBeginHandler = () => {
     'use memo'
-    runOnUI(onMomentumBegin)()
+    onMomentumBegin()
   }
 
   const onMomentumEndHandler = () => {
     'use memo'
-    runOnUI(onMomentumEnd)()
+    onMomentumEnd()
   }
 
   const scrollHandler = useAnimatedScrollHandler(
@@ -481,7 +491,8 @@ export const useScrollHandlerY = (name: TabName) => {
     ]
   )
 
-  // sync unfocused scenes
+  // sync unfocused scenes with debouncing to reduce jitter
+  const lastSyncTime = useSharedValue(0)
   useAnimatedReaction(
     () => {
       // if (!enabled.value) {
@@ -499,10 +510,19 @@ export const useScrollHandlerY = (name: TabName) => {
         isSyncNeeded !== wasSyncNeeded &&
         focusedTab.value !== name
       ) {
+        const now = Date.now()
+        
+        // 防抖动：限制同步频率，避免在快速切换时过于频繁的同步
+        if (now - lastSyncTime.value < 50) { // 20fps限制
+          return
+        }
+        
+        lastSyncTime.value = now
+        
         let nextPosition: number | null = null
         const focusedScrollY = scrollY.value[focusedTab.value]
         const tabScrollY = scrollY.value[name]
-        const areEqual = focusedScrollY === tabScrollY
+        const areEqual = Math.abs(focusedScrollY - tabScrollY) < 1 // 增加容差
 
         if (!areEqual) {
           const currIsOnTop =
@@ -527,7 +547,7 @@ export const useScrollHandlerY = (name: TabName) => {
           }
         }
 
-        if (nextPosition !== null) {
+        if (nextPosition !== null && Math.abs(nextPosition - tabScrollY) > 1 && !isScrolling.value) {
           // console.log(`sync ${name} ${nextPosition}`)
           scrollY.value[name] = nextPosition
           scrollTo(refMap[name], 0, nextPosition, false, `[${name}] sync pane`)
@@ -614,7 +634,7 @@ export function useAfterMountEffect(
 }
 
 export function useConvertAnimatedToValue<T>(
-  animatedValue: Animated.SharedValue<T>
+  animatedValue: SharedValue<T>
 ) {
   const [value, setValue] = useState<T>(animatedValue.value)
 
@@ -624,7 +644,7 @@ export function useConvertAnimatedToValue<T>(
     },
     (animValue) => {
       if (animValue !== value) {
-        runOnJS(setValue)(animValue)
+        setValue(animValue)
       }
     },
     [value]
@@ -637,7 +657,7 @@ export interface HeaderMeasurements {
   /**
    * Animated value that represents the current Y translation of the header
    */
-  top: Animated.SharedValue<number>
+  top: SharedValue<number>
   /**
    * Animated value that represents the height of the header
    */
@@ -655,7 +675,7 @@ export function useHeaderMeasurements(): HeaderMeasurements {
 /**
  * Returns the vertical scroll position of the current tab as an Animated SharedValue
  */
-export function useCurrentTabScrollY(): Animated.SharedValue<number> {
+export function useCurrentTabScrollY(): SharedValue<number> {
   const { scrollYCurrent } = useTabsContext()
   return scrollYCurrent
 }

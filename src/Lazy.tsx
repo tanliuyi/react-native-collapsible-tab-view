@@ -6,7 +6,6 @@ import Animated, {
   withTiming,
   useAnimatedStyle,
 } from 'react-native-reanimated'
-import { runOnJS } from 'react-native-worklets'
 
 import { ScrollView } from './ScrollView'
 import { useScroller, useTabNameContext, useTabsContext } from './hooks'
@@ -90,9 +89,9 @@ export const Lazy: React.FC<{
       if (focused && !wasFocused && !canMount) {
         if (cancelLazyFadeIn) {
           opacity.value = 1
-          runOnJS(setCanMount)(true)
+          setCanMount(true)
         } else {
-          runOnJS(startMountTimer)(focusedTab.value)
+          startMountTimer(focusedTab.value)
         }
       }
     },

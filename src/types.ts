@@ -223,6 +223,11 @@ export type ContextType<T extends TabName = TabName> = {
   allowHeaderOverscroll?: boolean
 
   minHeaderHeight: number
+
+  /**
+   * Shared value to track if any tab is currently scrolling to prevent conflicting scroll operations
+   */
+  isScrolling: SharedValue<boolean>
 }
 
 export type ScrollViewProps = ComponentProps<typeof Animated.ScrollView>

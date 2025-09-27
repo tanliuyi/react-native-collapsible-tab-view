@@ -10,7 +10,6 @@ import Animated, {
   withTiming,
   useFrameCallback,
 } from 'react-native-reanimated'
-import { runOnJS, runOnUI } from 'react-native-worklets'
 
 import { Context, TabNameContext } from './Context'
 import { Lazy } from './Lazy'
@@ -207,10 +206,28 @@ export const Container = React.memo(
         [onIndexChange, onTabChange]
       )
 
+      const lastSyncTime = useSharedValue(0)
+      const isScrolling = useSharedValue(false)
+      
       const syncCurrentTabScrollPosition = () => {
         'worklet'
 
         const name = tabNamesArray[index.value]
+        if (!name || !refMap[name]) return
+        
+        const now = Date.now()
+        
+        // 防抖动：限制同步频率，避免过于频繁的滚动操作
+        if (now - lastSyncTime.value < 16) { // 约60fps
+          return
+        }
+        
+        // 如果当前正在滚动，则跳过同步避免冲突
+        if (isScrolling.value) {
+          return
+        }
+        
+        lastSyncTime.value = now
         scrollToImpl(
           refMap[name],
           0,
@@ -221,7 +238,7 @@ export const Container = React.memo(
 
       /*
        * We run syncCurrentTabScrollPosition in every frame after the index
-       * changes for about 1500ms because the Lists can be late to accept the
+       * changes for about 500ms because the Lists can be late to accept the
        * scrollTo event we send. This fixes the issue of the scroll position
        * jumping when the user changes tab.
        * */
@@ -229,8 +246,8 @@ export const Container = React.memo(
         syncScrollFrame.setActive(toggle)
       const syncScrollFrame = useFrameCallback(({ timeSinceFirstFrame }) => {
         syncCurrentTabScrollPosition()
-        if (timeSinceFirstFrame > 1500) {
-          runOnJS(toggleSyncScrollFrame)(false)
+        if (timeSinceFirstFrame > 500) {
+          toggleSyncScrollFrame(false)
         }
       }, false)
 
@@ -240,24 +257,32 @@ export const Container = React.memo(
         },
         (i) => {
           if (i !== index.value) {
-            offset.value =
-              scrollY.value[tabNames.value[index.value]] -
-              scrollY.value[tabNames.value[i]] +
-              offset.value
-            runOnJS(propagateTabChange)({
+            const prevScrollY = scrollY.value[tabNames.value[index.value]] || 0
+            const nextScrollY = scrollY.value[tabNames.value[i]] || 0
+            
+            // 更平滑的偏移计算，避免突然的跳转
+            offset.value = prevScrollY - nextScrollY + offset.value
+            
+            propagateTabChange({
               prevIndex: index.value,
               index: i,
               prevTabName: tabNames.value[index.value],
               tabName: tabNames.value[i],
             })
+            
             index.value = i
-            if (
-              typeof scrollY.value[tabNames.value[index.value]] === 'number'
-            ) {
-              scrollYCurrent.value =
-                scrollY.value[tabNames.value[index.value]] || 0
+            
+            // 使用动画过渡来设置新的滚动位置，减少抖动
+            if (typeof nextScrollY === 'number') {
+              scrollYCurrent.value = withTiming(nextScrollY, {
+                duration: 150, // 短暂的动画过渡
+              })
             }
-            runOnJS(toggleSyncScrollFrame)(true)
+            
+            // 延迟启动同步，给动画一些时间
+            setTimeout(() => {
+              toggleSyncScrollFrame(true)
+            }, 100)
           }
         },
         []
@@ -295,7 +320,7 @@ export const Container = React.memo(
 
           if (name === focusedTab.value) {
             const ref = refMap[name]
-            runOnUI(scrollToImpl)(
+            scrollToImpl(
               ref,
               0,
               headerScrollDistance.value - contentInset,
@@ -313,7 +338,7 @@ export const Container = React.memo(
         () => tabNamesArray.length,
         (tabLength) => {
           if (index.value >= tabLength) {
-            runOnJS(onTabPress)(tabNamesArray[tabLength - 1])
+            onTabPress(tabNamesArray[tabLength - 1])
           }
         }
       )
@@ -376,6 +401,7 @@ export const Container = React.memo(
             headerTranslateY,
             width,
             allowHeaderOverscroll,
+            isScrolling,
           }}
         >
           <Animated.View
