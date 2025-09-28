@@ -8,7 +8,6 @@ import Animated, {
   useSharedValue,
   withDelay,
   withTiming,
-  useFrameCallback,
 } from 'react-native-reanimated'
 
 import { Context, TabNameContext } from './Context'
@@ -208,48 +207,50 @@ export const Container = React.memo(
 
       const lastSyncTime = useSharedValue(0)
       const isScrolling = useSharedValue(false)
+      const syncInProgress = useSharedValue(false)
+      const tabSwitchInProgress = useSharedValue(false)
       
+      // 极简高性能同步：专注于核心性能
       const syncCurrentTabScrollPosition = () => {
         'worklet'
 
         const name = tabNamesArray[index.value]
-        if (!name || !refMap[name]) return
+        if (!name || !refMap[name] || syncInProgress.value || tabSwitchInProgress.value || isScrolling.value) return
         
+        // 激进的防抖：大幅减少同步频率
         const now = Date.now()
+        if (now - lastSyncTime.value < 100) return // 降到10fps
         
-        // 防抖动：限制同步频率，避免过于频繁的滚动操作
-        if (now - lastSyncTime.value < 16) { // 约60fps
-          return
-        }
-        
-        // 如果当前正在滚动，则跳过同步避免冲突
-        if (isScrolling.value) {
-          return
-        }
-        
+        syncInProgress.value = true
         lastSyncTime.value = now
-        scrollToImpl(
-          refMap[name],
-          0,
-          scrollYCurrent.value - contentInset,
-          false
-        )
+        
+        // 直接执行，移除try-catch开销
+        scrollToImpl(refMap[name], 0, scrollYCurrent.value - contentInset, false)
+        syncInProgress.value = false
       }
 
       /*
-       * We run syncCurrentTabScrollPosition in every frame after the index
-       * changes for about 500ms because the Lists can be late to accept the
-       * scrollTo event we send. This fixes the issue of the scroll position
-       * jumping when the user changes tab.
+       * 终极性能策略：最小化同步操作
+       * 只在绝对必要时进行一次性同步
        * */
-      const toggleSyncScrollFrame = (toggle: boolean) =>
-        syncScrollFrame.setActive(toggle)
-      const syncScrollFrame = useFrameCallback(({ timeSinceFirstFrame }) => {
-        syncCurrentTabScrollPosition()
-        if (timeSinceFirstFrame > 500) {
-          toggleSyncScrollFrame(false)
+      const performCriticalSync = () => {
+        'worklet'
+        // 只执行一次关键同步，避免重复操作
+        setTimeout(() => {
+          if (!tabSwitchInProgress.value && !isScrolling.value) {
+            syncCurrentTabScrollPosition()
+          }
+        }, 100) // 给切换动画足够时间
+      }
+
+      // 清理资源，避免内存泄漏
+      React.useEffect(() => {
+        return () => {
+          // 组件卸载时清理状态
+          tabSwitchInProgress.value = false
+          isScrolling.value = false
         }
-      }, false)
+      }, [])
 
       useAnimatedReaction(
         () => {
@@ -272,17 +273,21 @@ export const Container = React.memo(
             
             index.value = i
             
-            // 使用动画过渡来设置新的滚动位置，减少抖动
+            // 优化动画过渡：使用更短的持续时间和更平滑的曲线
             if (typeof nextScrollY === 'number') {
               scrollYCurrent.value = withTiming(nextScrollY, {
-                duration: 150, // 短暂的动画过渡
+                duration: 100, // 减少到100ms，更快响应
               })
             }
             
-            // 延迟启动同步，给动画一些时间
+            // 启动智能同步
+            tabSwitchInProgress.value = true
+            
+            // 使用新的极简同步机制
             setTimeout(() => {
-              toggleSyncScrollFrame(true)
-            }, 100)
+              tabSwitchInProgress.value = false
+              performCriticalSync()
+            }, 50)
           }
         },
         []
@@ -327,7 +332,17 @@ export const Container = React.memo(
               true
             )
           } else {
+            // 终极优化：最简tab切换
+            tabSwitchInProgress.value = true
+            isScrolling.value = true
+            
             containerRef.current?.setPage(i)
+            
+            // 最短延迟，最快恢复
+            setTimeout(() => {
+              tabSwitchInProgress.value = false
+              isScrolling.value = false
+            }, 100)
           }
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps

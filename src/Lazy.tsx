@@ -42,21 +42,32 @@ export const Lazy: React.FC<{
   const didTriggerLayout = useSharedValue(false)
 
   /**
-   * This is used to control when children are mounted
-   */
-  const [canMount, setCanMount] = React.useState(false)
-  /**
-   * Ensure we don't mount after the component has been unmounted
-   */
-  const isSelfMounted = React.useRef(true)
-
-  /**
    * We start mounted if we are the focused tab, or if props.startMounted is true.
    */
   const shouldStartMounted =
     typeof _startMounted === 'boolean'
       ? _startMounted
       : focusedTab.value === name
+
+  /**
+   * This is used to control when children are mounted
+   * Initialize based on startMounted prop or focused state
+   */
+  const [canMount, setCanMount] = React.useState(() => {
+    // 如果 _startMounted 是 boolean 类型，直接使用它的值
+    if (typeof _startMounted === 'boolean') {
+      // console.log(`[Lazy] Tab ${name}: startMounted=${_startMounted}, initialCanMount=${_startMounted}`)
+      return _startMounted
+    }
+    // 否则检查是否是当前聚焦的标签页
+    const isFocused = focusedTab.value === name
+    // console.log(`[Lazy] Tab ${name}: no startMounted prop, focusedTab=${focusedTab.value}, isFocused=${isFocused}`)
+    return isFocused
+  })
+  /**
+   * Ensure we don't mount after the component has been unmounted
+   */
+  const isSelfMounted = React.useRef(true)
   let initialOpacity = 1
   if (!cancelLazyFadeIn && !shouldStartMounted) {
     initialOpacity = 0
@@ -68,6 +79,19 @@ export const Lazy: React.FC<{
       isSelfMounted.current = false
     }
   }, [])
+
+  // 监听 startMounted 属性变化，确保 lazy={false} 立即生效
+  React.useEffect(() => {
+    // 如果明确设置了 startMounted 为 true（即 lazy={false}），立即挂载
+    if (_startMounted === true && !canMount) {
+      setCanMount(true)
+    }
+    // 如果明确设置了 startMounted 为 false（即强制懒加载），只在聚焦时挂载
+    else if (_startMounted === false && canMount && focusedTab.value !== name) {
+      // 如果当前不是聚焦标签页且强制设置为 false，则不挂载
+      // 注意：这里不设置 setCanMount(false)，因为一旦挂载就不应该卸载
+    }
+  }, [_startMounted, canMount, focusedTab.value, name])
 
   const startMountTimer = React.useCallback(
     (focusedTab: string) => {

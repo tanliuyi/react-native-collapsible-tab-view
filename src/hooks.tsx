@@ -312,8 +312,10 @@ export const useScrollHandlerY = (name: TabName) => {
     'worklet'
     if (!enabled.value) return
 
-    // 标记滚动结束，允许同步操作
-    isScrolling.value = false
+    // 延迟标记滚动结束，确保滚动完全停止
+    setTimeout(() => {
+      isScrolling.value = false
+    }, 50)
 
     if (typeof snapThreshold === 'number') {
       if (revealHeaderOnScroll) {
